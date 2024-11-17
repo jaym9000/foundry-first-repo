@@ -15,3 +15,6 @@ docs/
 
 .DS_STORE
 zkout/
+
+broadcast/
+lib/
