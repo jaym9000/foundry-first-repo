@@ -1,235 +1,172 @@
-# Foundry Fund Me
+# Crowd-Sourcing FundMe Contract
 
-This is a section of the Cyfrin Solidity Course.
+## Overview
+The **Crowd-Sourcing FundMe Contract** is a decentralized smart contract built on Ethereum using Solidity. It allows multiple users to contribute ETH towards a common fund. Contributions are validated based on a minimum value in USD, ensuring that the amount users send is equivalent to at least **5 USD worth of ETH**, regardless of ETH price fluctuations. This is made possible by integrating **Chainlink's price feed**.
 
-*[⭐️ Updraft | Foundry Fund Me](https://updraft.cyfrin.io/courses/foundry/foundry-fund-me/fund-me-project-setup)*
+Once contributions are collected, the contract's owner (the account that deployed it) can withdraw the accumulated funds.
 
-- [Foundry Fund Me](#foundry-fund-me)
-- [Getting Started](#getting-started)
-  - [Requirements](#requirements)
-  - [Quickstart](#quickstart)
-    - [Optional Gitpod](#optional-gitpod)
-- [Usage](#usage)
-  - [Deploy](#deploy)
-  - [Testing](#testing)
-    - [Test Coverage](#test-coverage)
-  - [Local zkSync](#local-zksync)
-    - [(Additional) Requirements](#additional-requirements)
-    - [Setup local zkSync node](#setup-local-zksync-node)
-    - [Deploy to local zkSync node](#deploy-to-local-zksync-node)
-- [Deployment to a testnet or mainnet](#deployment-to-a-testnet-or-mainnet)
-  - [Scripts](#scripts)
-    - [Withdraw](#withdraw)
-  - [Estimate gas](#estimate-gas)
-- [Formatting](#formatting)
-- [Additional Info:](#additional-info)
-  - [Let's talk about what "Official" means](#lets-talk-about-what-official-means)
-  - [Summary](#summary)
-- [Thank you!](#thank-you)
+---
 
+## Features
+- **Fund Contributions**: Users can contribute ETH if their contribution meets the minimum value of 5 USD (converted using Chainlink's price feed).
+- **Minimum Contribution in USD**: Ensures all contributions are at least worth 5 USD in ETH, dynamically adjusting for market fluctuations.
+- **Owner Withdrawal**: Only the owner (deployer) can withdraw the accumulated funds.
+- **Fallback Mechanism**: Accepts direct ETH transfers via the `receive()` and `fallback()` functions.
+- **Efficient Withdrawals**: Resets funders’ balances and clears the list of contributors upon withdrawal.
 
-# Getting Started
+---
 
-## Requirements
+## Contract Structure
 
-- [git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
-  - You'll know you did it right if you can run `git --version` and you see a response like `git version x.x.x`
-- [foundry](https://getfoundry.sh/)
-  - You'll know you did it right if you can run `forge --version` and you see a response like `forge 0.2.0 (816e00b 2023-03-16T00:05:26.396218Z)`
+### 1. **FundMe Contract**
+The **FundMe** contract manages fund contributions, withdrawals, and interacts with Chainlink's price feed for ETH to USD conversion.
 
+**Key Variables**:
+- `i_owner`: The owner of the contract (only they can withdraw funds).
+- `MINIMUM_USD`: The minimum contribution in USD (5 USD). This is checked using the Chainlink price feed.
+- `s_addressToAmountFunded`: A mapping that tracks how much ETH each address has contributed.
+- `s_funders`: An array of addresses that have contributed ETH.
+- `s_priceFeed`: The Chainlink price feed contract for ETH/USD price data.
 
-## Quickstart
+**Key Functions**:
+- **`fund()`**: Allows users to send ETH to the contract, as long as the contribution is greater than or equal to 5 USD.
+    ```solidity
+    function fund() public payable {
+        require(
+            msg.value.getConversionRate(s_priceFeed) >= MINIMUM_USD,
+            "You need to spend more ETH!"
+        );
+        s_addressToAmountFunded[msg.sender] += msg.value;
+        s_funders.push(msg.sender);
+    }
+    ```
 
-```
-git clone https://github.com/Cyfrin/foundry-fund-me-cu
-cd foundry-fund-me-cu
-make
-```
+- **`cheaperWithdraw()`**: Allows the owner to withdraw all funds and resets the list of funders.
+    ```solidity
+    function cheaperWithdraw() public onlyOwner {
+        uint256 fundersLength = s_funders.length;
+        for (uint256 funderIndex = 0; funderIndex < fundersLength; funderIndex++) {
+            address funder = s_funders[funderIndex];
+            s_addressToAmountFunded[funder] = 0;
+        }
+        s_funders = new address      (bool callSuccess, ) = payable(msg.sender).call{value: address(this).balance}("");
+        require(callSuccess, "Call failed");
+    }
+    ```
 
-### Optional Gitpod
+- **`getVersion()`**: Returns the version of the Chainlink price feed.
+- **`fallback()` & `receive()`**: Handle direct ETH transfers to the contract, automatically triggering the `fund()` function.
 
-If you can't or don't want to run and install locally, you can work with this repo in Gitpod. If you do this, you can skip the `clone this repo` part.
+### 2. **PriceConverter Library**
+The **PriceConverter** library contains functions to interact with Chainlink's price feed, converting ETH to USD.
 
-[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#github.com/PatrickAlphaC/foundry-fund-me-cu)
+### **Functions:**
+- **`getPrice()`**: Retrieves the current ETH price in USD from the Chainlink price feed.
+    ```solidity
+    function getPrice(AggregatorV3Interface priceFeed) internal view returns (uint256) {
+        (, int256 answer, , , ) = priceFeed.latestRoundData();
+        return uint256(answer * 1e10); // Adjusts decimals
+    }
+    ```
 
-# Usage
+- **`getConversionRate()`**: Converts a given amount of ETH to USD.
+    ```solidity
+    function getConversionRate(uint256 ethAmount, AggregatorV3Interface priceFeed) internal view returns (uint256) {
+        uint256 ethPrice = getPrice(priceFeed);
+        uint256 ethAmountInUsd = (ethPrice * ethAmount) / 1e18;
+        return ethAmountInUsd;
+    }
+    ```
 
-## Deploy
+---
 
-```
-forge script script/DeployFundMe.s.sol
-```
+## How It Works
 
-## Testing
+### 1. **Contributing to the Fund**
+Users call the `fund()` function and send ETH to the contract. The contract ensures the contribution is worth at least 5 USD by converting ETH to USD using the Chainlink price feed.
 
-We talk about 4 test tiers in the video. 
-
-1. Unit
-2. Integration
-3. Forked
-4. Staging
-
-This repo we cover #1 and #3. 
-
-
-```
-forge test
-```
-
-or 
-
-```
-// Only run test functions matching the specified regex pattern.
-
-"forge test -m testFunctionName" is deprecated. Please use 
-
-forge test --match-test testFunctionName
-```
-
-or
-
-```
-forge test --fork-url $SEPOLIA_RPC_URL
-```
-
-### Test Coverage
-
-```
-forge coverage
+```solidity
+function fund() public payable {
+    require(
+        msg.value.getConversionRate(s_priceFeed) >= MINIMUM_USD,
+        "You need to spend more ETH!"
+    );
+    s_addressToAmountFunded[msg.sender] += msg.value;
+    s_funders.push(msg.sender);
+}
 ```
 
-## Local zkSync 
+If a user sends ETH directly to the contract, the receive() or fallback() functions are triggered, which call fund() and process the contribution.
 
-The instructions here will allow you to work with this repo on zkSync.
+### 2. **Checking Contributions**
+Anyone can check the amount contributed by a specific address using the getAddressToAmountFunded() getter function:
 
-### (Additional) Requirements 
+```solidity
+function getAddressToAmountFunded(address fundingAddress) external view returns (uint256);
+```
+### 3. **Withdrawing Funds**
+Only the owner can withdraw the funds. This is done using the cheaperWithdraw() function, which also resets the contributions and clears the list of funders.
 
-In addition to the requirements above, you'll need:
-- [foundry-zksync](https://github.com/matter-labs/foundry-zksync)
-  - You'll know you did it right if you can run `forge --version` and you see a response like `forge 0.0.2 (816e00b 2023-03-16T00:05:26.396218Z)`. 
-- [npx & npm](https://docs.npmjs.com/cli/v10/commands/npm-install)
-  - You'll know you did it right if you can run `npm --version` and you see a response like `7.24.0` and `npx --version` and you see a response like `8.1.0`.
-- [docker](https://docs.docker.com/engine/install/)
-  - You'll know you did it right if you can run `docker --version` and you see a response like `Docker version 20.10.7, build f0df350`.
-  - Then, you'll want the daemon running, you'll know it's running if you can run `docker --info` and in the output you'll see something like the following to know it's running:
+Example of the withdrawal logic:
+
+```solidity
+function cheaperWithdraw() public onlyOwner {
+    uint256 fundersLenght = s_funders.length;
+    for (uint256 funderIndex = 0; funderIndex < fundersLenght; funderIndex++) {
+        address funder = s_funders[funderIndex];
+        s_addressToAmountFunded[funder] = 0;
+    }
+    s_funders = new address ;
+ ool callSuccess, ) = payable(msg.sender).call{value: address(this).balance}("");
+    require(callSuccess, "Call failed");
+}
+```
+## Deployment
+### 1. **Deploying to Ethereum or Testnet**
+To deploy the contract, you need to provide the address of the Chainlink ETH/USD price feed contract for the network you're deploying to. For example:
+
+Sepolia Testnet: 0x0567F2323251f0A5f8fB9F4eFB9DBcc83C9B1B89 (ETH/USD Price Feed)
+The contract constructor takes this price feed address as an argument:
+
+```solidity
+constructor(address pricefeed) {
+    i_owner = msg.sender;
+    s_priceFeed = AggregatorV3Interface(pricefeed);
+}
+```
+### 2. **Interacting with the Contract**
+After deployment, users can contribute funds using the fund() function. The owner can withdraw all accumulated funds using the cheaperWithdraw() function.
+
+## **Getting Started**
+### **Prerequisites**
+- **`Solidity`**`: Basic understanding of Solidity and smart contract development.
+- **`Node.js & npm`**`: Install Node.js (for JavaScript tooling).
+- **`Ethereum Wallet`**`: Set up a wallet like MetaMask for interacting with Ethereum networks.
+- **`Chainlink Price Feeds`**`: Familiarity with Chainlink's price feeds for ETH/USD conversion.
+
+### **Installation**
+Clone the repository:
+
 ```bash
-Client:
- Context:    default
- Debug Mode: false
+git clone https://github.com/your-username/fund-me-contract.git
+cd fund-me-contract
 ```
-
-### Setup local zkSync node 
-
-Run the following:
+Install dependencies (if using Hardhat or Truffle):
 
 ```bash
-npx zksync-cli dev config
+npm install
 ```
+### **Deploying the Contract**
+Deploy the contract to your chosen Ethereum network using a tool like Hardhat or Truffle. You'll need the address of the Chainlink price feed for the network (e.g., Sepolia Testnet or Mainnet).
 
-And select: `In memory node` and do not select any additional modules.
+After deployment, interact with the contract using Web3.js or Ethers.js for calling functions like fund() and cheaperWithdraw().
 
-Then run:
-```bash
-npx zksync-cli dev start
-```
+### **License**
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-And you'll get an output like:
-```
-In memory node started v0.1.0-alpha.22:
- - zkSync Node (L2):
-  - Chain ID: 260
-  - RPC URL: http://127.0.0.1:8011
-  - Rich accounts: https://era.zksync.io/docs/tools/testing/era-test-node.html#use-pre-configured-rich-wallets
-```
+### **Conclusion**
+The Crowd-Sourcing FundMe Contract provides a decentralized, transparent way to collect and manage ETH contributions. It ensures that each contribution meets a fair value in USD by leveraging Chainlink’s real-time price feeds. The contract is simple to deploy and use, making it an ideal solution for Ethereum-based crowd funding applications.
 
-### Deploy to local zkSync node
-
-```bash
-make deploy-zk
-```
-
-This will deploy a mock price feed and a fund me contract to the zkSync node.
-
-# Deployment to a testnet or mainnet
-
-1. Setup environment variables
-
-You'll want to set your `SEPOLIA_RPC_URL` and `PRIVATE_KEY` as environment variables. You can add them to a `.env` file, similar to what you see in `.env.example`.
-
-- `PRIVATE_KEY`: The private key of your account (like from [metamask](https://metamask.io/)). **NOTE:** FOR DEVELOPMENT, PLEASE USE A KEY THAT DOESN'T HAVE ANY REAL FUNDS ASSOCIATED WITH IT.
-  - You can [learn how to export it here](https://metamask.zendesk.com/hc/en-us/articles/360015289632-How-to-Export-an-Account-Private-Key).
-- `SEPOLIA_RPC_URL`: This is url of the sepolia testnet node you're working with. You can get setup with one for free from [Alchemy](https://alchemy.com/?a=673c802981)
-
-Optionally, add your `ETHERSCAN_API_KEY` if you want to verify your contract on [Etherscan](https://etherscan.io/).
-
-2. Get testnet ETH
-
-Head over to [faucets.chain.link](https://faucets.chain.link/) and get some testnet ETH. You should see the ETH show up in your metamask.
-
-3. Deploy
-
-```
-forge script script/DeployFundMe.s.sol --rpc-url $SEPOLIA_RPC_URL --private-key $PRIVATE_KEY --broadcast --verify --etherscan-api-key $ETHERSCAN_API_KEY
-```
-
-## Scripts
-
-After deploying to a testnet or local net, you can run the scripts. 
-
-Using cast deployed locally example: 
-
-```
-cast send <FUNDME_CONTRACT_ADDRESS> "fund()" --value 0.1ether --private-key <PRIVATE_KEY>
-```
-
-or
-```
-forge script script/Interactions.s.sol:FundFundMe --rpc-url sepolia  --private-key $PRIVATE_KEY  --broadcast
-forge script script/Interactions.s.sol:WithdrawFundMe --rpc-url sepolia  --private-key $PRIVATE_KEY  --broadcast
-```
-
-### Withdraw
-
-```
-cast send <FUNDME_CONTRACT_ADDRESS> "withdraw()"  --private-key <PRIVATE_KEY>
-```
-
-## Estimate gas
-
-You can estimate how much gas things cost by running:
-
-```
-forge snapshot
-```
-
-And you'll see an output file called `.gas-snapshot`
-
-
-# Formatting
-
-
-To run code formatting:
-```
-forge fmt
-```
-
-# Additional Info:
-Some users were having a confusion that whether Chainlink-brownie-contracts is an official Chainlink repository or not. Here is the info.
-Chainlink-brownie-contracts is an official repo. The repository is owned and maintained by the chainlink team for this very purpose, and gets releases from the proper chainlink release process. You can see it's still the `smartcontractkit` org as well.
-
-https://github.com/smartcontractkit/chainlink-brownie-contracts
-
-## Let's talk about what "Official" means
-The "official" release process is that chainlink deploys it's packages to [npm](https://www.npmjs.com/package/@chainlink/contracts). So technically, even downloading directly from `smartcontractkit/chainlink` is wrong, because it could be using unreleased code.
-
-So, then you have two options:
-
-1. Download from NPM and have your codebase have dependencies foreign to foundry
-2. Download from the chainlink-brownie-contracts repo which already downloads from npm and then packages it nicely for you to use in foundry.
-## Summary
-1. That is an official repo maintained by the same org
-2. It downloads from the official release cycle `chainlink/contracts` use (npm) and packages it nicely for digestion from foundry.
-   
 
 # Thank you!
 
