@@ -165,7 +165,7 @@ After deployment, interact with the contract using Web3.js or Ethers.js for call
 This project is licensed under the MIT License - see the LICENSE file for details.
 
 ### **Conclusion**
-The Crowd-Sourcing FundMe Contract provides a decentralized, transparent way to collect and manage ETH contributions. It ensures that each contribution meets a fair value in USD by leveraging Chainlink’s real-time price feeds. The contract is simple to deploy and use, making it an ideal solution for Ethereum-based crowd funding applications.
+The Crowd-Sourcing FundMe Contract provides a decentralized, transparent way to collect and manage ETH contributions. It ensures that each contribution meets a fair value in USD by leveraging Chainlink’s real-time price feeds. The contract is simple to deploy and use, making it an ideal solution for Ethereum-based crowdfunding applications.
 
 
 # Thank you!
@@ -174,8 +174,8 @@ If you appreciated this, feel free to follow me or donate! *Below is JM's addres
 
 ETH/Arbitrum/Optimism/Polygon/etc Address: 0x0f879bFF6c5cb229AFBaFCfFFE6C0FC29f95c796
 
-[![Patrick Collins Twitter](https://img.shields.io/badge/Twitter-1DA1F2?style=for-the-badge&logo=twitter&logoColor=white)](https://x.com/JM_Mahoro)
-[![Patrick Collins Linkedin](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/jeanmarcc/)
+[![Twitter](https://img.shields.io/badge/Twitter-1DA1F2?style=for-the-badge&logo=twitter&logoColor=white)](https://x.com/JM_Mahoro)
+[![Linkedin](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/jeanmarcc/)
 
 
 <!-- Testing krunchdata https://kdta.io/b6T40  -->
